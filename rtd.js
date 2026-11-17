@@ -471,7 +471,6 @@
     });
     this.panel.appendChild(el('div', { class: 'rtd-q' }, [
       el('h3', { class: 'rtd-h', text: 'Unfinished Thickness?' }),
-      el('p', { class: 'rtd-muted', text: 'We’ll only show pieces at least this thick, so they can be flattened down to your pour depth.' }),
       row, nav(this, 1, 3)
     ]));
   };
