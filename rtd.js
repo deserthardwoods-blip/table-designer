@@ -26,6 +26,12 @@
       { label: 'Dining (8 seat)', L: 84, W: 40 },
       { label: 'Dining (10 seat)', L: 96, W: 42 }
     ],
+    oval: [
+      { label: 'Oval coffee table', L: 48, W: 30 },
+      { label: 'Oval dining (6)', L: 72, W: 42 },
+      { label: 'Oval dining (8)', L: 84, W: 44 },
+      { label: 'Oval dining (10)', L: 96, W: 48 }
+    ],
     round: [
       { label: 'Side table', L: 24, W: 24 },
       { label: 'Café table', L: 36, W: 36 },
@@ -129,6 +135,13 @@
   }
 
   /* ---------- geometry ---------- */
+  // Is point (x, y) on the table top? Round and oval are ellipses (round: L = W).
+  function onTable(s, x, y, pad) {
+    pad = pad || 0;
+    if (s.shape === 'rect') return x >= -pad && x <= s.L + pad && y >= -pad && y <= s.W + pad;
+    var rx = s.L / 2 + pad, ry = s.W / 2 + pad, dx = (x - s.L / 2) / rx, dy = (y - s.W / 2) / ry;
+    return dx * dx + dy * dy <= 1;
+  }
   function localPoly(p) {
     var pts = [], i;
     if (p.hull && p.hull.length > 2) return p.hull.map(function (q) { return [q[0] * p.L, q[1] * p.W]; });
@@ -452,8 +465,9 @@
 
   Designer.prototype.renderSize = function () {
     var s = this.state, self = this;
-    var shapeRow = el('div', { class: 'rtd-choices rtd-choices--2' }, [
+    var shapeRow = el('div', { class: 'rtd-choices rtd-choices--3' }, [
       choice('Rectangle', 'Dining, coffee, desk', s.shape === 'rect', function () { if (s.shape !== 'rect') { s.shape = 'rect'; s.L = 72; s.W = 36; } self.render(); }),
+      choice('Oval', 'Dining & coffee', s.shape === 'oval', function () { if (s.shape !== 'oval') { s.shape = 'oval'; s.L = 72; s.W = 42; } self.render(); }),
       choice('Round', 'Side, café, round dining', s.shape === 'round', function () { if (s.shape !== 'round') { s.shape = 'round'; s.L = s.W = 44; } self.render(); })
     ]);
     var presets = el('div', { class: 'rtd-choices' });
@@ -540,7 +554,7 @@
     var resin = RESINS.filter(function (r) { return r.id === s.resin; })[0] || RESINS[0];
 
     // toolbar
-    var tableLbl = s.shape === 'round' ? fmtIn(s.L) + ' round' : fmtIn(s.L) + ' × ' + fmtIn(s.W);
+    var tableLbl = s.shape === 'round' ? fmtIn(s.L) + ' round' : fmtIn(s.L) + ' × ' + fmtIn(s.W) + (s.shape === 'oval' ? ' oval' : '');
     this.toolbar = el('div', { class: 'rtd-toolbar' }, [
       el('div', { class: 'rtd-toolbar__spec' }, [
         el('strong', { text: tableLbl }), el('span', { text: ' · ' + fmtIn(s.T) + ' thick · ' + resin.name + ' resin' }),
@@ -656,8 +670,7 @@
   Designer.prototype.outside = function (cand) { // how many outline points hang past the edge
     var s = this.state, n = 0;
     worldPoly(this.pieces[cand.id], cand).forEach(function (q) {
-      if (s.shape === 'round') { if (Math.hypot(q[0] - s.L / 2, q[1] - s.W / 2) > s.L / 2 + 0.5) n++; }
-      else if (q[0] < -0.5 || q[0] > s.L + 0.5 || q[1] < -0.5 || q[1] > s.W + 0.5) n++;
+      if (!onTable(s, q[0], q[1], 0.5)) n++;
     });
     return n;
   };
@@ -696,6 +709,7 @@
   Designer.prototype.tableShape = function (attrs) {
     var s = this.state;
     if (s.shape === 'round') return svg('circle', Object.assign({ cx: s.L / 2, cy: s.W / 2, r: s.L / 2 }, attrs || {}));
+    if (s.shape === 'oval') return svg('ellipse', Object.assign({ cx: s.L / 2, cy: s.W / 2, rx: s.L / 2, ry: s.W / 2 }, attrs || {}));
     return svg('rect', Object.assign({ x: 0, y: 0, width: s.L, height: s.W, rx: Math.min(s.L, s.W) * 0.01 }, attrs || {}));
   };
 
@@ -705,7 +719,7 @@
     var resin = RESINS.filter(function (r) { return r.id === s.resin; })[0] || RESINS[0];
     var m = Math.max(s.L, s.W) * 0.09;
     // On phones, stand long tables up vertically so they fill the screen width.
-    var portrait = this.svgWrap.clientWidth < 600 && s.shape === 'rect' && s.L > s.W * 1.3;
+    var portrait = this.svgWrap.clientWidth < 600 && s.shape !== 'round' && s.L > s.W * 1.3;
     this.portrait = portrait;
     var root = svg('svg', {
       viewBox: portrait
@@ -850,7 +864,7 @@
       clearTimeout(t);
       t = setTimeout(function () {
         if (self.state.step !== 4 || !self.svgWrap) return;
-        var want = self.svgWrap.clientWidth < 600 && self.state.shape === 'rect' && self.state.L > self.state.W * 1.3;
+        var want = self.svgWrap.clientWidth < 600 && self.state.shape !== 'round' && self.state.L > self.state.W * 1.3;
         if (want !== self.portrait) self.drawTable();
       }, 150);
     });
@@ -969,7 +983,7 @@
     });
     var total = 0, wood = 0, cx = s.L / 2, cy = s.W / 2, R = s.L / 2;
     for (var y = res / 2; y < s.W; y += res) for (var x = res / 2; x < s.L; x += res) {
-      if (s.shape === 'round' && Math.hypot(x - cx, y - cy) > R) continue;
+      if (!onTable(s, x, y)) continue;
       total++;
       for (var i = 0; i < polys.length; i++) {
         var b = boxes[i];
@@ -1023,7 +1037,7 @@
 
   Designer.prototype.designRef = function () {
     var s = this.state;
-    return (s.shape === 'round' ? fmtIn(s.L) + ' round' : fmtIn(s.L) + 'x' + fmtIn(s.W)) + ' x ' + fmtIn(s.T) + ', ' + s.resin + ' resin';
+    return (s.shape === 'round' ? fmtIn(s.L) + ' round' : fmtIn(s.L) + 'x' + fmtIn(s.W) + (s.shape === 'oval' ? ' oval' : '')) + ' x ' + fmtIn(s.T) + ', ' + s.resin + ' resin';
   };
   Designer.prototype.shareUrl = function () { return location.origin + location.pathname + '#d=' + this.encode(); };
   Designer.prototype.encode = function () {
@@ -1039,7 +1053,7 @@
     if (!m) return;
     try {
       var o = b64d(m[1]), s = this.state;
-      s.shape = o.s === 'round' ? 'round' : 'rect';
+      s.shape = o.s === 'round' || o.s === 'oval' ? o.s : 'rect';
       s.L = +o.L || 72; s.W = +o.W || 36; s.T = THICKNESSES.indexOf(+o.T) > -1 ? +o.T : 2.25; s.kind = o.k || 'both'; s.resin = o.c || 'clear';
       s.placed = (o.p || []).map(function (a) { return { id: a[0], x: +a[1], y: +a[2], rot: +a[3] || 0, photoRot: +a[4] || 0 }; });
       s.step = 4;
