@@ -996,11 +996,9 @@
     }
     this.stats.innerHTML = '';
     this.stats.appendChild(stat('Wood coverage', pct + '%', pct < 35 ? 'Lots of resin' : pct > 80 ? 'Mostly wood' : ''));
-    this.stats.appendChild(stat('Resin to pour', s.placed.length ? (Math.round(gal * 10) / 10) + ' gal' : '—', 'Estimate incl. 10% extra'));
     this.stats.appendChild(stat('Wood subtotal', money(subtotal, this.cfg.moneyFormat), s.placed.length + ' piece' + (s.placed.length === 1 ? '' : 's')));
 
     this.summary.innerHTML = '';
-    if (nConf) this.summary.appendChild(el('p', { class: 'rtd-warn', text: 'Some pieces overlap (outlined in red). They\u2019d have to be cut to fit \u2014 move or rotate them apart if you want each piece whole.' }));
     var actions = el('div', { class: 'rtd-actions' }, [
       el('button', { type: 'button', class: 'btn btn--secondary rtd-btn-ghost', text: 'Copy link to this design', disabled: s.placed.length ? null : 'disabled', onclick: function () { self.copyLink(); } }),
       el('button', { type: 'button', class: 'btn btn--secondary rtd-btn-ghost', text: 'Download sketch', disabled: s.placed.length ? null : 'disabled', onclick: function () { self.download(); } })
@@ -1019,7 +1017,7 @@
       ]));
     }
     if (this.cfg.epoxyUrl && s.placed.length) {
-      this.summary.appendChild(el('p', { class: 'rtd-muted' }, ['Need epoxy? ', el('a', { href: this.cfg.epoxyUrl, class: 'rtd-link', text: 'Shop deep-pour resin and pigments' }), ' — you’ll need about ' + (Math.round(gal * 10) / 10) + ' gallons for this top.']));
+      this.summary.appendChild(el('p', { class: 'rtd-muted' }, ['Need epoxy? ', el('a', { href: this.cfg.epoxyUrl, class: 'rtd-link', text: 'Shop deep-pour resin and pigments' })]));
     }
   };
 
