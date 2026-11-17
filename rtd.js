@@ -797,7 +797,7 @@
       main.classList.add('rtd-piece');
 
       // outline + label + hit target (unclipped so you can grab overhang)
-      var sel = s.selected === pl.id, bad = conflicts[pl.id];
+      var sel = s.selected === pl.id, bad = false; // overlaps aren't outlined any more
       var hit = svg('g', { transform: tf, class: 'rtd-hit' + (sel ? ' is-sel' : '') + (bad ? ' is-bad' : ''), tabindex: '0', role: 'button', 'aria-label': (p.sku || p.title) + ', ' + fmtIn(p.L) + ' by ' + fmtIn(p.W) });
       if (useCut) {
         hit.appendChild(pieceShape({ fill: 'transparent', stroke: bad ? '#d93025' : 'none', 'stroke-width': 0.45, 'stroke-dasharray': '1 0.6' }));
