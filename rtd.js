@@ -36,6 +36,16 @@
   };
   var THICKNESSES = [1.25, 1.5, 2.25];
 
+  // Collections the designer pulls pieces from (handle + shape to assume when
+  // the title doesn't say cookie/slice/slab). Overrides the theme section's
+  // two collection pickers, so this list can change without a theme publish.
+  var COLLECTIONS = [
+    { handle: 'large-olive-wood-cookies-24', kind: 'cookie' },     // Large Olive Wood Cookies 24"+
+    { handle: 'olivewood-rootball-slices-cookies-slabs', kind: 'cookie' }, // Olive Wood Cookies
+    { handle: 'charcuterie-board-stock', kind: 'slab' },           // Charcuterie Board Stock
+    { handle: 'live-edge-olive-wood-slabs', kind: 'slab' }         // Live Edge Olive Wood Slabs
+  ];
+
   /* ---------- helpers ---------- */
   function el(tag, attrs, kids) {
     var n = document.createElement(tag);
@@ -338,10 +348,10 @@
 
   Designer.prototype.load = function () {
     var self = this;
-    var jobs = [];
-    if (this.cfg.cookies) jobs.push(this.fetchAll(this.cfg.cookies, 'cookie'));
-    if (this.cfg.slabs) jobs.push(this.fetchAll(this.cfg.slabs, 'slab'));
+    var failed = 0;
+    var jobs = COLLECTIONS.map(function (c) { return self.fetchAll(c.handle, c.kind).catch(function () { failed++; }); });
     Promise.all(jobs).then(function () {
+      if (failed === COLLECTIONS.length) throw new Error('no collections loaded');
       self.list = Object.keys(self.pieces).map(function (k) { return self.pieces[k]; });
       self.loaded = true;
       // drop restored placements that sold since the link was made
