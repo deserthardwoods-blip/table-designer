@@ -84,6 +84,8 @@ a.rtd-link{color:inherit}
 .rtd-card.is-on{background:var(--rtd-soft);border-color:#c9b79c}
 .rtd-card__img{width:64px;height:64px;flex:0 0 64px;border-radius:6px;overflow:hidden;background:#e9e3d9}
 .rtd-card__img img{width:100%;height:100%;object-fit:cover;display:block}
+.rtd-card__img.is-cut{background:#f1ede6}
+.rtd-card__img.is-cut img{object-fit:contain;padding:3px}
 .rtd-card__body{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
 .rtd-card__top{display:flex;justify-content:space-between;gap:8px}
 .rtd-card__price{font-weight:600}

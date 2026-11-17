@@ -321,6 +321,13 @@
     return H;
   }
 
+  // Cutouts made by tools/make_cutouts.py live in the repo's cutouts/ folder.
+  // They're read from @main (not the pinned code version) so new pieces get
+  // their cutout without a code release.
+  var SCRIPT_SRC = (document.currentScript && document.currentScript.src) || '';
+  var REPO = (SCRIPT_SRC.match(/cdn\.jsdelivr\.net\/gh\/([^@]+)@/) || [])[1] || 'deserthardwoods-blip/table-designer';
+  var CUTOUT_BASE = 'https://cdn.jsdelivr.net/gh/' + REPO + '@main/cutouts/';
+
   /* ---------- designer ---------- */
   function Designer(root) {
     this.root = root;
@@ -350,6 +357,9 @@
     var self = this;
     var failed = 0;
     var jobs = COLLECTIONS.map(function (c) { return self.fetchAll(c.handle, c.kind).catch(function () { failed++; }); });
+    this.cutIndex = {};
+    jobs.push(fetch(CUTOUT_BASE + 'index.json').then(function (r) { return r.ok ? r.json() : {}; })
+      .then(function (j) { self.cutIndex = j || {}; }).catch(function () {}));
     Promise.all(jobs).then(function () {
       if (failed === COLLECTIONS.length) throw new Error('no collections loaded');
       self.list = Object.keys(self.pieces).map(function (k) { return self.pieces[k]; });
@@ -599,7 +609,11 @@
     av.list.forEach(function (p) {
       var on = !!av.placedIds[p.id];
       var card = el('div', { class: 'rtd-card' + (on ? ' is-on' : '') }, [
-        el('div', { class: 'rtd-card__img' }, [p.img ? el('img', { src: imgUrl(p.img, 240), alt: p.title, loading: 'lazy', width: '120', height: '120' }) : null]),
+        el('div', { class: 'rtd-card__img' + (self.cutIndex && self.cutIndex[p.id] ? ' is-cut' : '') }, [
+          self.cutIndex && self.cutIndex[p.id]
+            ? el('img', { src: CUTOUT_BASE + self.cutIndex[p.id].f, alt: p.title, loading: 'lazy', width: '120', height: '120' })
+            : (p.img ? el('img', { src: imgUrl(p.img, 240), alt: p.title, loading: 'lazy', width: '120', height: '120' }) : null)
+        ]),
         el('div', { class: 'rtd-card__body' }, [
           el('div', { class: 'rtd-card__top' }, [
             el('strong', { text: p.sku || 'No SKU' }),
@@ -843,7 +857,13 @@
 
   Designer.prototype.ensureCutout = function (p) {
     var self = this;
-    if (!p || !p.cutSrc || p.cutState) return; // only prepared cutouts; raw photos are too busy to cut reliably
+    if (!p || p.cutState) return;
+    var ix = this.cutIndex && this.cutIndex[p.id];
+    if (ix && ix.f) { // made in advance by tools/make_cutouts.py
+      p.cut = CUTOUT_BASE + ix.f; p.hull = ix.hull; p.cutState = 'ok';
+      return;
+    }
+    if (!p.cutSrc) return; // raw photos are too busy to cut in the browser
     p.cutState = 'loading';
     makeCutout(p.cutSrc.indexOf('cdn.shopify.com') > -1 ? imgUrl(p.cutSrc, CUT_SIZE) : p.cutSrc).then(function (r) {
       p.cut = r ? r.url : null; p.hull = r ? r.hull : null; p.cutState = r ? 'ok' : 'failed';
