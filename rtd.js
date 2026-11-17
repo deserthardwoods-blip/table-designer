@@ -335,11 +335,29 @@
   }
 
   // Cutouts made by tools/make_cutouts.py live in the repo's cutouts/ folder.
-  // They're read from @main (not the pinned code version) so new pieces get
-  // their cutout without a code release.
+  // We ask GitHub for the newest commit on main and load the cutouts pinned to
+  // it (jsDelivr caches "@main" for hours; a commit link is always exact), so
+  // new and re-coloured cutouts show up straight away without a code release.
   var SCRIPT_SRC = (document.currentScript && document.currentScript.src) || '';
   var REPO = (SCRIPT_SRC.match(/cdn\.jsdelivr\.net\/gh\/([^@]+)@/) || [])[1] || 'deserthardwoods-blip/table-designer';
-  var CUTOUT_BASE = 'https://cdn.jsdelivr.net/gh/' + REPO + '@main/cutouts/';
+  function cutoutBase(ref) { return 'https://cdn.jsdelivr.net/gh/' + REPO + '@' + ref + '/cutouts/'; }
+  function latestCommit() {
+    var key = 'rtd-sha-' + REPO, hit;
+    try { hit = JSON.parse(sessionStorage.getItem(key) || 'null'); } catch (_) {}
+    if (hit && Date.now() - hit.t < 10 * 60 * 1000) return Promise.resolve(hit.sha);
+    var ctl = window.AbortController ? new AbortController() : null;
+    var timer = setTimeout(function () { if (ctl) ctl.abort(); }, 4000);
+    return fetch('https://api.github.com/repos/' + REPO + '/commits/main', { headers: { Accept: 'application/vnd.github.sha' }, signal: ctl ? ctl.signal : undefined })
+      .then(function (r) { if (!r.ok) throw new Error(r.status); return r.text(); })
+      .then(function (sha) {
+        clearTimeout(timer);
+        sha = (sha || '').trim();
+        if (!/^[0-9a-f]{40}$/.test(sha)) throw new Error('bad sha');
+        try { sessionStorage.setItem(key, JSON.stringify({ sha: sha, t: Date.now() })); } catch (_) {}
+        return sha;
+      })
+      .catch(function () { clearTimeout(timer); return 'main'; });
+  }
 
   /* ---------- designer ---------- */
   function Designer(root) {
@@ -371,7 +389,11 @@
     var failed = 0;
     var jobs = COLLECTIONS.map(function (c) { return self.fetchAll(c.handle, c.kind).catch(function () { failed++; }); });
     this.cutIndex = {};
-    jobs.push(fetch(CUTOUT_BASE + 'index.json').then(function (r) { return r.ok ? r.json() : {}; })
+    this.cutBase = cutoutBase('main');
+    jobs.push(latestCommit().then(function (ref) {
+      self.cutBase = cutoutBase(ref);
+      return fetch(self.cutBase + 'index.json');
+    }).then(function (r) { return r.ok ? r.json() : {}; })
       .then(function (j) { self.cutIndex = j || {}; }).catch(function () {}));
     Promise.all(jobs).then(function () {
       if (failed === COLLECTIONS.length) throw new Error('no collections loaded');
@@ -626,7 +648,7 @@
       var card = el('div', { class: 'rtd-card' + (on ? ' is-on' : '') }, [
         el('div', { class: 'rtd-card__img' + (self.cutIndex && self.cutIndex[p.id] ? ' is-cut' : '') }, [
           self.cutIndex && self.cutIndex[p.id]
-            ? el('img', { src: CUTOUT_BASE + self.cutIndex[p.id].f, alt: p.title, loading: 'lazy', width: '120', height: '120' })
+            ? el('img', { src: self.cutBase + self.cutIndex[p.id].f, alt: p.title, loading: 'lazy', width: '120', height: '120' })
             : (p.img ? el('img', { src: imgUrl(p.img, 240), alt: p.title, loading: 'lazy', width: '120', height: '120' }) : null)
         ]),
         el('div', { class: 'rtd-card__body' }, [
@@ -875,7 +897,7 @@
     if (!p || p.cutState) return;
     var ix = this.cutIndex && this.cutIndex[p.id];
     if (ix && ix.f) { // made in advance by tools/make_cutouts.py
-      p.cut = CUTOUT_BASE + ix.f; p.hull = ix.hull; p.cutState = 'ok';
+      p.cut = this.cutBase + ix.f; p.hull = ix.hull; p.cutState = 'ok';
       return;
     }
     if (!p.cutSrc) return; // raw photos are too busy to cut in the browser
