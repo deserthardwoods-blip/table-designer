@@ -26,6 +26,10 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(ROOT, 'cutouts')
 INDEX = os.path.join(OUT, 'index.json')
 MAX_SIDE = 900          # longest side of saved cutout, px
+COLOR_VERSION = 2       # bump to re-colour every cutout on the next run
+# Target average colour for the wood, in CIE Lab: a warm, sunlit olive tan.
+TARGET_L, TARGET_A, TARGET_B = 60.0, 13.0, 30.0
+COLOR_STRENGTH = 0.85   # 1 = match target exactly, 0 = leave photo colours alone
 SRC_WIDTH = 1080        # photo width requested from Shopify's CDN
 
 # ---- same rules as rtd.js -------------------------------------------------
@@ -135,6 +139,56 @@ def to_srgb(im):
         return im
 
 
+# ---- colour: even out lighting differences between photos --------------
+def _srgb_to_lab(rgb):
+    c = rgb / 255.0
+    c = np.where(c > 0.04045, ((c + 0.055) / 1.055) ** 2.4, c / 12.92)
+    M = np.array([[0.4124, 0.3576, 0.1805], [0.2126, 0.7152, 0.0722], [0.0193, 0.1192, 0.9505]])
+    xyz = c @ M.T / np.array([0.95047, 1.0, 1.08883])
+    f = np.where(xyz > 0.008856, np.cbrt(xyz), 7.787 * xyz + 16 / 116)
+    return np.stack([116 * f[..., 1] - 16, 500 * (f[..., 0] - f[..., 1]), 200 * (f[..., 1] - f[..., 2])], -1)
+
+
+def _lab_to_srgb(lab):
+    fy = (lab[..., 0] + 16) / 116
+    fx, fz = fy + lab[..., 1] / 500, fy - lab[..., 2] / 200
+    f = np.stack([fx, fy, fz], -1)
+    xyz = np.where(f ** 3 > 0.008856, f ** 3, (f - 16 / 116) / 7.787) * np.array([0.95047, 1.0, 1.08883])
+    M = np.array([[3.2406, -1.5372, -0.4986], [-0.9689, 1.8758, 0.0415], [0.0557, -0.2040, 1.0570]])
+    c = xyz @ M.T
+    c = np.where(c > 0.0031308, 1.055 * np.clip(c, 0, None) ** (1 / 2.4) - 0.055, 12.92 * c)
+    return np.clip(c * 255, 0, 255)
+
+
+def even_out_color(rgba):
+    """Shift the piece's average warmth/brightness toward TARGET, keeping all
+    light/dark and grain variation (an additive shift in Lab, not RGB gains,
+    so dark bark stays brown instead of turning purple)."""
+    a = np.array(rgba).astype(float)
+    m = a[..., 3] > 200
+    if m.sum() < 100:
+        return rgba
+    lab = _srgb_to_lab(a[..., :3])
+    L, A, B = lab[..., 0], lab[..., 1], lab[..., 2]
+    mid = m & (L > 25) & (L < 90)                 # judge colour on mid-tones only
+    if mid.sum() < 100:
+        mid = m
+    k = COLOR_STRENGTH
+    dA = (TARGET_A - np.median(A[mid])) * k
+    dB = (TARGET_B - np.median(B[mid])) * k
+    # Pieces already warmer/golder than the target only get toned down a
+    # little; pulling yellow out of them turns their dark bark purple.
+    if dA < 0: dA *= 0.35
+    if dB < 0: dB *= 0.35
+    w = np.clip((L - 8) / 30, 0.35, 1.0)        # gentler shift in the darkest bark
+    lab[..., 1] = A + dA * w
+    lab[..., 2] = B + dB * w
+    Lm = np.median(L[mid])                        # brightness: half-way to target
+    lab[..., 0] = np.clip(L + (TARGET_L - Lm) * 0.5 * k, 0, 100)
+    a[..., :3] = _lab_to_srgb(lab)
+    return Image.fromarray(a.astype(np.uint8), 'RGBA')
+
+
 def cutout(img_bytes, prepared=False):
     im = to_srgb(Image.open(io.BytesIO(img_bytes))).convert('RGBA')
     if prepared and im.getchannel('A').getextrema()[0] < 250:
@@ -188,7 +242,7 @@ def cutout(img_bytes, prepared=False):
     if crop.shape[0] > crop.shape[1] * 1.05:   # long side horizontal
         crop = np.rot90(crop, 1)
         m = np.rot90(m, 1)
-    out = Image.fromarray(crop, 'RGBA')
+    out = even_out_color(Image.fromarray(crop, 'RGBA'))
     if max(out.size) > MAX_SIDE:
         out.thumbnail((MAX_SIDE, MAX_SIDE), Image.LANCZOS)
     # outline for overlap checks, normalised to -0.5..0.5
@@ -223,7 +277,8 @@ def main():
         del index[k]
 
     todo = [k for k, p in live.items()
-            if (not only or k in only) and (k not in index or index[k].get('src') != p['src'])]
+            if (not only or k in only) and (k not in index or index[k].get('src') != p['src']
+                                            or index[k].get('cv') != COLOR_VERSION)]
     if args.limit:
         todo = todo[:args.limit]
     made, failed = [], []
@@ -240,7 +295,7 @@ def main():
         img, hull, q = res
         fname = f'{k}.webp'
         img.save(os.path.join(OUT, fname), 'WEBP', quality=82, method=6)
-        index[k] = {'f': fname, 'src': p['src'], 'sku': p['sku'], 'w': img.size[0], 'h': img.size[1], 'hull': hull, 'q': q}
+        index[k] = {'cv': COLOR_VERSION, 'f': fname, 'src': p['src'], 'sku': p['sku'], 'w': img.size[0], 'h': img.size[1], 'hull': hull, 'q': q}
         made.append(k)
         print(f'[{i}/{len(todo)}] {p["sku"] or k}: ok {img.size} cover={q["frac"]:.0%}{" EDGE" if q["edge"] else ""}', flush=True)
 
