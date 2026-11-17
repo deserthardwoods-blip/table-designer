@@ -530,6 +530,7 @@
         this.toolBtn('⟲', 'Rotate left 15°', function () { self.rotateSel(-15); }),
         this.toolBtn('⟳', 'Rotate right 15°', function () { self.rotateSel(15); }),
         this.toolBtn('90°', 'Rotate 90°', function () { self.rotateSel(90); }),
+        this.toolBtn('Turn photo', 'Turn the photo 90° inside the piece', function () { self.turnPhoto(); }),
         this.toolBtn('✕', 'Remove from table', function () { self.removeSel(); }),
         el('label', { class: 'rtd-toggle' }, [
           (function () { var c = el('input', { type: 'checkbox' }); c.checked = s.photos; c.addEventListener('change', function () { s.photos = c.checked; self.drawTable(); }); return c; })(),
@@ -660,6 +661,13 @@
     this.drawTable();
   };
 
+  Designer.prototype.turnPhoto = function () {
+    var pl = this.selPlacement();
+    if (!pl) { this.toast('Tap a piece on the table first.'); return; }
+    pl.photoRot = ((pl.photoRot || 0) + 90) % 360;
+    this.drawTable();
+  };
+
   Designer.prototype.tableShape = function (attrs) {
     var s = this.state;
     if (s.shape === 'round') return svg('circle', Object.assign({ cx: s.L / 2, cy: s.W / 2, r: s.L / 2 }, attrs || {}));
@@ -745,12 +753,12 @@
         }
         g.appendChild(pieceShape({ fill: '#8a6a45', stroke: '#4d3a24', 'stroke-width': 0.18 }));
         if (s.photos && p.img) {
-          var cid = 'rtd-pc-' + pl.id + (faded ? 'g' : '');
-          var pc = svg('clipPath', { id: cid });
-          pc.appendChild(pieceShape());
-          defs.appendChild(pc);
-          var im = svg('image', { href: imgUrl(p.img, 500), x: -p.L / 2, y: -p.W / 2, width: p.L, height: p.W, preserveAspectRatio: 'xMidYMid slice', 'clip-path': 'url(#' + cid + ')' });
-          im.setAttributeNS('http://www.w3.org/1999/xlink', 'xlink:href', imgUrl(p.img, 500));
+          // Whole photo, letterboxed inside the piece (never cropped). "Turn photo"
+          // spins it 90° so a slab shot standing up can lie along the table.
+          var turned = (pl.photoRot || 0) % 180 !== 0;
+          var bw = turned ? p.W : p.L, bh = turned ? p.L : p.W;
+          var im = svg('image', { href: imgUrl(p.img, 600), x: -bw / 2, y: -bh / 2, width: bw, height: bh, preserveAspectRatio: 'xMidYMid meet', transform: 'rotate(' + (pl.photoRot || 0) + ')' });
+          im.setAttributeNS('http://www.w3.org/1999/xlink', 'xlink:href', imgUrl(p.img, 600));
           g.appendChild(im);
         } else {
           // simple wood rings for outline mode
@@ -825,9 +833,9 @@
 
   Designer.prototype.ensureCutout = function (p) {
     var self = this;
-    if (!p || !p.img || p.cutState) return;
+    if (!p || !p.cutSrc || p.cutState) return; // only prepared cutouts; raw photos are too busy to cut reliably
     p.cutState = 'loading';
-    makeCutout(imgUrl(p.cutSrc || p.img, CUT_SIZE)).then(function (r) {
+    makeCutout(p.cutSrc.indexOf('cdn.shopify.com') > -1 ? imgUrl(p.cutSrc, CUT_SIZE) : p.cutSrc).then(function (r) {
       p.cut = r ? r.url : null; p.hull = r ? r.hull : null; p.cutState = r ? 'ok' : 'failed';
       if (r && self.state.placed.some(function (pl) { return pl.id === p.id; })) {
         if (self.dragging) self.pendingRedraw = true; else self.drawTable();
@@ -980,7 +988,7 @@
   Designer.prototype.shareUrl = function () { return location.origin + location.pathname + '#d=' + this.encode(); };
   Designer.prototype.encode = function () {
     var s = this.state;
-    return b64e({ v: 1, s: s.shape, L: s.L, W: s.W, T: s.T, k: s.kind, c: s.resin, p: s.placed.map(function (p) { return [p.id, +p.x.toFixed(2), +p.y.toFixed(2), Math.round(p.rot)]; }) });
+    return b64e({ v: 1, s: s.shape, L: s.L, W: s.W, T: s.T, k: s.kind, c: s.resin, p: s.placed.map(function (p) { return [p.id, +p.x.toFixed(2), +p.y.toFixed(2), Math.round(p.rot), p.photoRot || 0]; }) });
   };
   Designer.prototype.saveHash = function () {
     if (this.state.step !== 4 || !this.loaded) return;
@@ -993,7 +1001,7 @@
       var o = b64d(m[1]), s = this.state;
       s.shape = o.s === 'round' ? 'round' : 'rect';
       s.L = +o.L || 72; s.W = +o.W || 36; s.T = THICKNESSES.indexOf(+o.T) > -1 ? +o.T : 2.25; s.kind = o.k || 'both'; s.resin = o.c || 'clear';
-      s.placed = (o.p || []).map(function (a) { return { id: a[0], x: +a[1], y: +a[2], rot: +a[3] || 0 }; });
+      s.placed = (o.p || []).map(function (a) { return { id: a[0], x: +a[1], y: +a[2], rot: +a[3] || 0, photoRot: +a[4] || 0 }; });
       s.step = 4;
       this.render();
     } catch (_) {}
