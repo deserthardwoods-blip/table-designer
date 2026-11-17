@@ -560,10 +560,11 @@
     ]);
 
     this.svgWrap = el('div', { class: 'rtd-canvas' });
+    this.cartBar = el('div', { class: 'rtd-cartbar' });
     this.stats = el('div', { class: 'rtd-stats' });
     this.summary = el('div', { class: 'rtd-summary' });
 
-    var stage = el('div', { class: 'rtd-stage' }, [this.toolbar, this.svgWrap,
+    var stage = el('div', { class: 'rtd-stage' }, [this.toolbar, this.svgWrap, this.cartBar,
       el('p', { class: 'rtd-hint', text: 'Drag pieces to move them. Drag the round handle, or use the buttons, to rotate. Anything past the edge gets trimmed off when the top is cut to size.' }),
       this.stats, this.summary]);
 
@@ -999,13 +1000,24 @@
     this.stats.appendChild(stat('Wood subtotal', money(subtotal, this.cfg.moneyFormat), s.placed.length + ' piece' + (s.placed.length === 1 ? '' : 's')));
 
     this.summary.innerHTML = '';
-    if (nConf) this.summary.appendChild(el('p', { class: 'rtd-warn', text: 'Some pieces overlap (outlined in red). Move or rotate them apart before ordering.' }));
+    if (nConf) this.summary.appendChild(el('p', { class: 'rtd-warn', text: 'Some pieces overlap (outlined in red). They\u2019d have to be cut to fit \u2014 move or rotate them apart if you want each piece whole.' }));
     var actions = el('div', { class: 'rtd-actions' }, [
-      el('button', { type: 'button', class: 'btn rtd-cart', text: 'Add ' + s.placed.length + ' piece' + (s.placed.length === 1 ? '' : 's') + ' to cart', disabled: s.placed.length && !nConf ? null : 'disabled', onclick: function () { self.addToCart(this); } }),
       el('button', { type: 'button', class: 'btn btn--secondary rtd-btn-ghost', text: 'Copy link to this design', disabled: s.placed.length ? null : 'disabled', onclick: function () { self.copyLink(); } }),
       el('button', { type: 'button', class: 'btn btn--secondary rtd-btn-ghost', text: 'Download sketch', disabled: s.placed.length ? null : 'disabled', onclick: function () { self.download(); } })
     ]);
     this.summary.appendChild(actions);
+
+    if (this.cartBar) {
+      this.cartBar.innerHTML = '';
+      var n = s.placed.length;
+      this.cartBar.appendChild(el('div', { class: 'rtd-cartbar__info' }, n
+        ? [el('strong', { text: n + ' piece' + (n === 1 ? '' : 's') + ' on your table' }), el('span', { text: s.placed.map(function (pl) { return self.pieces[pl.id] ? self.pieces[pl.id].sku : ''; }).filter(Boolean).join(', ') })]
+        : [el('strong', { text: 'Your table is empty' }), el('span', { text: 'Add pieces from the list to price your table.' })]));
+      this.cartBar.appendChild(el('div', { class: 'rtd-cartbar__buy' }, [
+        el('span', { class: 'rtd-cartbar__total', text: money(subtotal, this.cfg.moneyFormat) }),
+        el('button', { type: 'button', class: 'btn rtd-cart', text: n ? 'Add all ' + n + ' to cart' : 'Add to cart', disabled: n ? null : 'disabled', onclick: function () { self.addToCart(this); } })
+      ]));
+    }
     if (this.cfg.epoxyUrl && s.placed.length) {
       this.summary.appendChild(el('p', { class: 'rtd-muted' }, ['Need epoxy? ', el('a', { href: this.cfg.epoxyUrl, class: 'rtd-link', text: 'Shop deep-pour resin and pigments' }), ' — you’ll need about ' + (Math.round(gal * 10) / 10) + ' gallons for this top.']));
     }
@@ -1058,7 +1070,7 @@
       })
       .then(function () { window.location.href = self.cfg.cartUrl; })
       .catch(function (err) {
-        btn.disabled = false; btn.textContent = 'Add to cart';
+        btn.disabled = false; btn.textContent = 'Add all ' + s.placed.length + ' to cart';
         self.toast((err && (err.description || err.message)) || 'Sorry, something went wrong. One of these pieces may have just sold.');
       });
   };

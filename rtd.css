@@ -119,3 +119,12 @@ a.rtd-link{color:inherit}
   .rtd-svg{max-height:none}
 }
 @media (prefers-reduced-motion:reduce){.rtd-toast,.rtd-choice{transition:none}}
+
+/* add-all-to-cart bar under the sketch */
+.rtd-cartbar{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;margin-top:12px;padding:12px 14px;border:1.5px solid var(--rtd-accent);border-radius:var(--rtd-r);background:var(--rtd-bg)}
+.rtd-cartbar__info{display:flex;flex-direction:column;gap:2px;min-width:0}
+.rtd-cartbar__info span{font-size:.85em;opacity:.7;overflow-wrap:anywhere}
+.rtd-cartbar__buy{display:flex;align-items:center;gap:14px}
+.rtd-cartbar__total{font-size:1.3em;font-weight:600}
+.rtd-cartbar .btn[disabled]{opacity:.45;cursor:not-allowed}
+@media (max-width:600px){.rtd-cartbar__buy{width:100%;justify-content:space-between}.rtd-cartbar .btn{flex:1}}
