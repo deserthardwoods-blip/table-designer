@@ -34,7 +34,7 @@
       { label: 'Large round', L: 60, W: 60 }
     ]
   };
-  var THICKNESSES = [1, 1.25, 1.5, 2, 2.25];
+  var THICKNESSES = [1.25, 1.5, 2.25];
 
   /* ---------- helpers ---------- */
   function el(tag, attrs, kids) {
@@ -324,7 +324,7 @@
       root: d.rootUrl || '/'
     };
     this.state = {
-      step: 1, shape: 'rect', L: 72, W: 36, T: 2, kind: 'both', resin: 'clear',
+      step: 1, shape: 'rect', L: 72, W: 36, T: 2.25, kind: 'both', resin: 'clear',
       photos: true, placed: [], selected: null, sort: 'size', q: ''
     };
     this.pieces = {}; // variantId -> piece
@@ -994,7 +994,7 @@
     try {
       var o = b64d(m[1]), s = this.state;
       s.shape = o.s === 'round' ? 'round' : 'rect';
-      s.L = +o.L || 72; s.W = +o.W || 36; s.T = +o.T || 2; s.kind = o.k || 'both'; s.resin = o.c || 'clear';
+      s.L = +o.L || 72; s.W = +o.W || 36; s.T = THICKNESSES.indexOf(+o.T) > -1 ? +o.T : 2.25; s.kind = o.k || 'both'; s.resin = o.c || 'clear';
       s.placed = (o.p || []).map(function (a) { return { id: a[0], x: +a[1], y: +a[2], rot: +a[3] || 0 }; });
       s.step = 4;
       this.render();
