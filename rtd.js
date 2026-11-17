@@ -536,7 +536,7 @@
     var maxDim = Math.max(s.L, s.W) * 1.15;
     var out = this.list.filter(function (p) {
       if (s.kind !== 'both' && p.kind !== s.kind) return false;
-      if (p.T + 0.001 < s.T) return false;
+      if (Math.abs(p.T - s.T) > 0.01) return false; // exact unfinished thickness only
       if (p.W > maxDim) return false;
       if (q && (p.sku + ' ' + p.title).toLowerCase().indexOf(q) === -1) return false;
       return true;
@@ -616,9 +616,9 @@
     if (!this.loaded) { this.listCount.textContent = 'Loading pieces…'; return; }
     if (this.loadError) { this.listCount.textContent = 'We couldn’t load inventory. Please refresh the page.'; return; }
     var av = this.available();
-    this.listCount.textContent = av.list.length + ' piece' + (av.list.length === 1 ? '' : 's') + ' at ' + fmtIn(s.T) + ' or thicker';
+    this.listCount.textContent = av.list.length + ' piece' + (av.list.length === 1 ? '' : 's') + ' at ' + fmtIn(s.T) + ' thick';
     if (!av.list.length) {
-      this.listEl.appendChild(el('p', { class: 'rtd-empty', text: 'Nothing matches right now. Try a thinner top, or switch between cookies and slabs.' }));
+      this.listEl.appendChild(el('p', { class: 'rtd-empty', text: 'Nothing at this thickness right now. Try another thickness, or switch between cookies and slabs.' }));
       return;
     }
     av.list.forEach(function (p) {
