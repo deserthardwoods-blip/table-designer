@@ -466,8 +466,7 @@
     var s = this.state, self = this;
     var row = el('div', { class: 'rtd-choices' });
     THICKNESSES.forEach(function (t) {
-      var sub = t <= 1.25 ? 'Side & coffee tables' : t <= 1.5 ? 'Coffee & desks' : 'Dining tables';
-      row.appendChild(choice(fmtIn(t), sub, s.T === t, function () { s.T = t; self.render(); }));
+      row.appendChild(choice(fmtIn(t), '', s.T === t, function () { s.T = t; self.render(); }));
     });
     this.panel.appendChild(el('div', { class: 'rtd-q' }, [
       el('h3', { class: 'rtd-h', text: 'Unfinished Thickness?' }),
