@@ -534,7 +534,7 @@
   Designer.prototype.renderKind = function () {
     var s = this.state, self = this;
     var row = el('div', { class: 'rtd-choices rtd-choices--3' }, [
-      choice('Cookies', 'Round cross-cut slices with bark rings', s.kind === 'cookie', function () { s.kind = 'cookie'; self.render(); }),
+      choice('Cookies', 'Cross Cut Cookies, Slices, Rounds', s.kind === 'cookie', function () { s.kind = 'cookie'; self.render(); }),
       choice('Slabs', 'Long live-edge boards, classic river tables', s.kind === 'slab', function () { s.kind = 'slab'; self.render(); }),
       choice('Mix of both', 'Show me everything that fits', s.kind === 'both', function () { s.kind = 'both'; self.render(); })
     ]);
