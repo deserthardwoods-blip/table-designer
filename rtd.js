@@ -51,6 +51,12 @@
     { handle: 'charcuterie-board-stock', kind: 'slab' },           // Charcuterie Board Stock
     { handle: 'live-edge-olive-wood-slabs', kind: 'slab' }         // Live Edge Olive Wood Slabs
   ];
+  // Anything in these collections is never offered, even if it's also in one
+  // of the collections above (multi-piece sets and kits).
+  var EXCLUDE_COLLECTIONS = [
+    'sets-of-olive-wood-cookies',   // Sets of Olive Wood Cookies
+    'olive-wood-pre-cut-kits'       // Olive Wood Pre Cut Kits
+  ];
 
   /* ---------- helpers ---------- */
   function el(tag, attrs, kids) {
@@ -387,7 +393,9 @@
   Designer.prototype.load = function () {
     var self = this;
     var failed = 0;
+    this.excluded = {};
     var jobs = COLLECTIONS.map(function (c) { return self.fetchAll(c.handle, c.kind).catch(function () { failed++; }); });
+    EXCLUDE_COLLECTIONS.forEach(function (h) { jobs.push(self.fetchIds(h).catch(function () {})); });
     this.cutIndex = {};
     this.cutBase = cutoutBase('main');
     jobs.push(latestCommit().then(function (ref) {
@@ -397,6 +405,7 @@
       .then(function (j) { self.cutIndex = j || {}; }).catch(function () {}));
     Promise.all(jobs).then(function () {
       if (failed === COLLECTIONS.length) throw new Error('no collections loaded');
+      Object.keys(self.excluded).forEach(function (vid) { delete self.pieces[vid]; });
       self.list = Object.keys(self.pieces).map(function (k) { return self.pieces[k]; });
       self.loaded = true;
       // drop restored placements that sold since the link was made
@@ -409,6 +418,20 @@
       self.loadError = true;
       self.render();
     });
+  };
+
+  // Variant ids of everything in a collection (used for EXCLUDE_COLLECTIONS).
+  Designer.prototype.fetchIds = function (handle) {
+    var self = this, page = 1;
+    function next() {
+      return fetch(self.cfg.root.replace(/\/$/, '') + '/collections/' + encodeURIComponent(handle) + '/products.json?limit=250&page=' + page)
+        .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+        .then(function (data) {
+          (data.products || []).forEach(function (pr) { (pr.variants || []).forEach(function (v) { self.excluded[v.id] = 1; }); });
+          if ((data.products || []).length === 250 && page < 8) { page++; return next(); }
+        });
+    }
+    return next();
   };
 
   Designer.prototype.fetchAll = function (handle, kind) {

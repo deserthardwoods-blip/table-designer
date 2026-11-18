@@ -87,6 +87,27 @@ def fetch(url, tries=3):
             time.sleep(2 * (i + 1))
 
 
+def excluded_from_rtd():
+    js = open(os.path.join(ROOT, 'rtd.js'), encoding='utf-8').read()
+    if 'var EXCLUDE_COLLECTIONS' not in js:
+        return []
+    block = js[js.index('var EXCLUDE_COLLECTIONS'):]
+    block = block[:block.index('];')]
+    return re.findall(r"'([^']+)'", block)
+
+
+def collection_variant_ids(store, handle):
+    ids, page = set(), 1
+    while page <= 8:
+        prods = json.loads(fetch(f'{store}/collections/{handle}/products.json?limit=250&page={page}')).get('products', [])
+        for pr in prods:
+            ids.update(str(v['id']) for v in pr.get('variants') or [])
+        if len(prods) < 250:
+            break
+        page += 1
+    return ids
+
+
 def pieces(store):
     found = {}
     for handle in collections_from_rtd():
@@ -109,6 +130,9 @@ def pieces(store):
             if len(prods) < 250:
                 break
             page += 1
+    for handle in excluded_from_rtd():          # sets / kits are never offered
+        for vid in collection_variant_ids(store, handle):
+            found.pop(vid, None)
     return found
 
 
