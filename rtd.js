@@ -42,8 +42,8 @@
   };
   var THICKNESSES = [1.25, 1.5, 2.25];
 
-  // Collections the designer pulls pieces from (handle + shape to assume when
-  // the title doesn't say cookie/slice/slab). Overrides the theme section's
+  // Collections the designer pulls pieces from. A piece in any "cookie"
+  // collection is a cookie; everything else is a slab. Overrides the theme section's
   // two collection pickers, so this list can change without a theme publish.
   var COLLECTIONS = [
     { handle: 'large-olive-wood-cookies-24', kind: 'cookie' },     // Large Olive Wood Cookies 24"+
@@ -423,14 +423,15 @@
             if (!v.available || !isSinglePiece(pr.title)) return;
             var dims = parseDims(pr.title);
             if (!dims) return;
-            if (self.pieces[v.id]) return; // in both collections; first wins
+            // In more than one collection: a cookie collection always wins.
+            if (self.pieces[v.id]) { if (kind === 'cookie') self.pieces[v.id].kind = 'cookie'; return; }
             self.pieces[v.id] = {
               id: v.id, handle: pr.handle, title: pr.title, sku: v.sku || '',
               price: Math.round(parseFloat(v.price) * 100),
               img: pr.images && pr.images[0] ? pr.images[0].src : '',
               cutSrc: (function () { var c = (pr.images || []).filter(function (im) { return /cutout/i.test(im.src); })[0]; return c ? c.src : ''; })(),
               L: dims.L, W: dims.W, T: dims.T,
-              kind: kindOf(pr.title, kind)
+              kind: kind // from the collection, not the title
             };
           });
           if ((data.products || []).length === 250 && page < 8) { page++; return next(); }
